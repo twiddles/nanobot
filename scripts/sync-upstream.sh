@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Sync local main with upstream HKUDS/nanobot, preserving local commits.
+#
+# Strategy: reset to upstream/main, then cherry-pick local-only commits.
+# This preserves upstream's exact SHAs (including merge commits) so GitHub
+# shows "N ahead, 0 behind" rather than duplicate diverged histories.
+#
 # Usage:
-#   ./sync-upstream.sh          # fetch + rebase only
-#   ./sync-upstream.sh --push   # fetch + rebase + push to origin
+#   ./sync-upstream.sh          # fetch + sync only
+#   ./sync-upstream.sh --push   # fetch + sync + push to origin
 
 set -euo pipefail
 
@@ -53,20 +58,28 @@ if [ "$LOCAL" = "$BASE" ]; then
     info "Fast-forwarding to upstream (no local-only commits)"
     git merge --ff-only "$UPSTREAM_NAME/$BRANCH"
     ok "Fast-forwarded to upstream"
+elif [ "$REMOTE" = "$BASE" ]; then
+    ok "Already ahead of upstream — nothing to sync."
+    exit 0
 else
-    LOCAL_ONLY=$(git rev-list "$UPSTREAM_NAME/$BRANCH"..HEAD --count)
+    # Collect local-only commit SHAs (oldest first) for cherry-pick
+    LOCAL_COMMITS=$(git rev-list --reverse "$UPSTREAM_NAME/$BRANCH"..HEAD)
+    LOCAL_COUNT=$(echo "$LOCAL_COMMITS" | wc -l | tr -d ' ')
     UPSTREAM_NEW=$(git rev-list HEAD.."$UPSTREAM_NAME/$BRANCH" --count)
-    info "Rebasing $LOCAL_ONLY local commit(s) on top of $UPSTREAM_NEW new upstream commit(s)"
+    info "Replaying $LOCAL_COUNT local commit(s) on top of $UPSTREAM_NEW new upstream commit(s)"
 
-    if ! git rebase "$UPSTREAM_NAME/$BRANCH"; then
-        err "Rebase conflict! Resolve manually, then:"
-        err "  git rebase --continue"
+    # Reset to upstream, then cherry-pick local commits
+    git reset --hard "$UPSTREAM_NAME/$BRANCH"
+
+    if ! echo "$LOCAL_COMMITS" | xargs git cherry-pick; then
+        err "Cherry-pick conflict! Resolve manually, then:"
+        err "  git cherry-pick --continue"
         err "  git push --force-with-lease origin $BRANCH"
         err ""
-        err "Or abort with: git rebase --abort"
+        err "Or abort with: git cherry-pick --abort"
         exit 1
     fi
-    ok "Rebase successful"
+    ok "Sync successful — $LOCAL_COUNT local commit(s) replayed"
 fi
 
 # --- push ------------------------------------------------------------------
