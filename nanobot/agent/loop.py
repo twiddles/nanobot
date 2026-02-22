@@ -163,13 +163,41 @@ class AgentLoop:
 
     @staticmethod
     def _tool_hint(tool_calls: list) -> str:
-        """Format tool calls as concise hint, e.g. 'web_search("query")'."""
+        """Format tool calls as concise hint for progress messages."""
+        def _truncate(s: str, n: int = 60) -> str:
+            return f"{s[:n]}…" if len(s) > n else s
+
         def _fmt(tc):
-            val = next(iter(tc.arguments.values()), None) if tc.arguments else None
-            if not isinstance(val, str):
-                return tc.name
-            return f'{tc.name}("{val[:40]}…")' if len(val) > 40 else f'{tc.name}("{val}")'
-        return ", ".join(_fmt(tc) for tc in tool_calls)
+            args = tc.arguments or {}
+            name = tc.name
+
+            # exec: show the command in a code block
+            if name == "exec" and args.get("command"):
+                cmd = _truncate(args["command"])
+                return f"`{cmd}`"
+
+            # File tools: show just the basename
+            if name in ("read_file", "write_file", "edit_file") and args.get("path"):
+                import os
+                return f"📄 {name.replace('_', ' ')} `{os.path.basename(args['path'])}`"
+
+            # Web tools: show the query or URL
+            if name == "web_search" and args.get("query"):
+                return f"🔍 {_truncate(args['query'])}"
+            if name == "web_fetch" and args.get("url"):
+                return f"🌐 {_truncate(args['url'])}"
+
+            # Message: show a brief preview
+            if name == "message" and args.get("content"):
+                return f"💬 {_truncate(args['content'], 50)}"
+
+            # Default: tool_name("first_arg_value")
+            val = next(iter(args.values()), None) if args else None
+            if isinstance(val, str):
+                return f"`{name}` {_truncate(val, 40)}"
+            return f"`{name}`"
+
+        return "\n".join(_fmt(tc) for tc in tool_calls)
 
     async def _run_agent_loop(
         self,
