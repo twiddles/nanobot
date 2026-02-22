@@ -1,6 +1,6 @@
 #!/bin/bash
 # Count core agent lines (excluding channels/, cli/, providers/ adapters)
-cd "$(dirname "$0")" || exit 1
+cd "$(dirname "$0")/.." || exit 1
 
 echo "nanobot core agent line count"
 echo "================================"
