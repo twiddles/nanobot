@@ -161,6 +161,25 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
 
     # === Standard providers (matched by model-name keywords) ===============
 
+    # Claude Code: uses Claude Pro/Max OAuth tokens, not API key.
+    ProviderSpec(
+        name="claude_code",
+        keywords=("claude-code", "claude_code"),
+        env_key="",                         # OAuth-based, no API key
+        display_name="Claude Code",
+        litellm_prefix="",                  # Not routed through LiteLLM
+        skip_prefixes=(),
+        env_extras=(),
+        is_gateway=False,
+        is_local=False,
+        detect_by_key_prefix="",
+        detect_by_base_keyword="",
+        default_api_base="https://api.anthropic.com/v1",
+        strip_model_prefix=False,
+        model_overrides=(),
+        is_oauth=True,                      # OAuth-based authentication
+    ),
+
     # Anthropic: LiteLLM recognizes "claude-*" natively, no prefix needed.
     ProviderSpec(
         name="anthropic",

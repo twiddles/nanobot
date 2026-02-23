@@ -233,11 +233,16 @@ def _make_provider(config: Config):
     """Create the appropriate LLM provider from config."""
     from nanobot.providers.litellm_provider import LiteLLMProvider
     from nanobot.providers.openai_codex_provider import OpenAICodexProvider
+    from nanobot.providers.claude_code_provider import ClaudeCodeProvider
     from nanobot.providers.custom_provider import CustomProvider
 
     model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
     p = config.get_provider(model)
+
+    # Claude Code (OAuth via Claude Pro/Max subscription)
+    if provider_name == "claude_code" or model.startswith(("claude-code/", "claude_code/")):
+        return ClaudeCodeProvider(default_model=model, api_key=p.api_key if p and p.api_key else None)
 
     # OpenAI Codex (OAuth)
     if provider_name == "openai_codex" or model.startswith("openai-codex/"):
@@ -1117,6 +1122,33 @@ def _login_github_copilot() -> None:
         console.print("[green]✓ Authenticated with GitHub Copilot[/green]")
     except Exception as e:
         console.print(f"[red]Authentication error: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@_register_login("claude_code")
+def _login_claude_code() -> None:
+    import json as _json
+
+    cred_path = Path.home() / ".claude" / ".credentials.json"
+    if not cred_path.exists():
+        console.print("[red]No credentials found at ~/.claude/.credentials.json[/red]")
+        console.print("Run [cyan]claude setup-token[/cyan] to configure your Claude Pro/Max token.")
+        raise typer.Exit(1)
+
+    try:
+        data = _json.loads(cred_path.read_text())
+        oauth = data.get("claudeAiOauth", {})
+        if not oauth.get("accessToken"):
+            console.print("[red]No access token found in credentials[/red]")
+            console.print("Run [cyan]claude setup-token[/cyan] to configure your token.")
+            raise typer.Exit(1)
+        sub_type = oauth.get("subscriptionType", "unknown")
+        rate_tier = oauth.get("rateLimitTier", "unknown")
+        console.print(f"[green]✓ Authenticated with Claude Code[/green]")
+        console.print(f"  Subscription: {sub_type}")
+        console.print(f"  Rate limit tier: {rate_tier}")
+    except Exception as e:
+        console.print(f"[red]Error reading credentials: {e}[/red]")
         raise typer.Exit(1)
 
 
