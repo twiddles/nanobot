@@ -99,6 +99,7 @@ class AgentLoop:
         self._consolidating: set[str] = set()  # Session keys with consolidation in progress
         self._consolidation_tasks: set[asyncio.Task] = set()  # Strong refs to in-flight tasks
         self._consolidation_locks: dict[str, asyncio.Lock] = {}
+        self._active_tasks: dict[str, asyncio.Task] = {}  # session_key -> processing task
         self._register_default_tools()
 
     def _register_default_tools(self) -> None:
@@ -277,23 +278,57 @@ class AgentLoop:
                     self.bus.consume_inbound(),
                     timeout=1.0
                 )
-                try:
-                    response = await self._process_message(msg)
-                    if response is not None:
-                        await self.bus.publish_outbound(response)
-                    elif msg.channel == "cli":
+
+                key = msg.session_key
+                cmd = msg.content.strip().lower()
+
+                # Handle /stop: cancel the active task for this session
+                if cmd == "/stop":
+                    task = self._active_tasks.pop(key, None)
+                    if task and not task.done():
+                        task.cancel()
                         await self.bus.publish_outbound(OutboundMessage(
-                            channel=msg.channel, chat_id=msg.chat_id, content="", metadata=msg.metadata or {},
+                            channel=msg.channel, chat_id=msg.chat_id,
+                            content="Stopped.",
                         ))
-                except Exception as e:
-                    logger.error("Error processing message: {}", e)
-                    await self.bus.publish_outbound(OutboundMessage(
-                        channel=msg.channel,
-                        chat_id=msg.chat_id,
-                        content=f"Sorry, I encountered an error: {str(e)}"
-                    ))
+                    else:
+                        await self.bus.publish_outbound(OutboundMessage(
+                            channel=msg.channel, chat_id=msg.chat_id,
+                            content="Nothing to stop — no active request.",
+                        ))
+                    continue
+
+                # Spawn processing as a task so the loop stays free for /stop
+                self._active_tasks[key] = asyncio.create_task(
+                    self._process_and_publish(msg)
+                )
+
             except asyncio.TimeoutError:
+                # Clean up completed tasks
+                self._active_tasks = {
+                    k: t for k, t in self._active_tasks.items() if not t.done()
+                }
                 continue
+
+    async def _process_and_publish(self, msg: InboundMessage) -> None:
+        """Process a message and publish the response."""
+        try:
+            response = await self._process_message(msg)
+            if response is not None:
+                await self.bus.publish_outbound(response)
+            elif msg.channel == "cli":
+                await self.bus.publish_outbound(OutboundMessage(
+                    channel=msg.channel, chat_id=msg.chat_id, content="", metadata=msg.metadata or {},
+                ))
+        except asyncio.CancelledError:
+            logger.info("Request cancelled for {}:{}", msg.channel, msg.chat_id)
+        except Exception as e:
+            logger.error("Error processing message: {}", e)
+            await self.bus.publish_outbound(OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content=f"Sorry, I encountered an error: {str(e)}"
+            ))
 
     async def close_mcp(self) -> None:
         """Close MCP connections."""
@@ -386,7 +421,18 @@ class AgentLoop:
                                   content="New session started.")
         if cmd == "/help":
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="🐈 nanobot commands:\n/new — Start a new conversation\n/help — Show available commands")
+                                  content=(
+                                      "🐈 nanobot commands:\n"
+                                      "/new — Start a new conversation\n"
+                                      "/model — Show current model\n"
+                                      "/status — Show session and system status\n"
+                                      "/compact — Force memory consolidation\n"
+                                      "/memory — Show long-term memory\n"
+                                      "/cron — List scheduled jobs\n"
+                                      "/skills — List available skills\n"
+                                      "/stop — Cancel the current request\n"
+                                      "/help — Show available commands"
+                                  ))
 
         unconsolidated = len(session.messages) - session.last_consolidated
         if (unconsolidated >= self.memory_window and session.key not in self._consolidating):

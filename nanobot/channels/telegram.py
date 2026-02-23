@@ -111,6 +111,13 @@ class TelegramChannel(BaseChannel):
     BOT_COMMANDS = [
         BotCommand("start", "Start the bot"),
         BotCommand("new", "Start a new conversation"),
+        BotCommand("model", "Show current model"),
+        BotCommand("status", "Show session and system status"),
+        BotCommand("compact", "Force memory consolidation"),
+        BotCommand("memory", "Show long-term memory"),
+        BotCommand("cron", "List scheduled jobs"),
+        BotCommand("skills", "List available skills"),
+        BotCommand("stop", "Cancel the current request"),
         BotCommand("help", "Show available commands"),
     ]
     
@@ -145,8 +152,9 @@ class TelegramChannel(BaseChannel):
         
         # Add command handlers
         self._app.add_handler(CommandHandler("start", self._on_start))
-        self._app.add_handler(CommandHandler("new", self._forward_command))
         self._app.add_handler(CommandHandler("help", self._on_help))
+        for cmd in ("new", "model", "status", "compact", "memory", "cron", "skills", "stop"):
+            self._app.add_handler(CommandHandler(cmd, self._forward_command))
         
         # Add message handler for text, photos, voice, documents
         self._app.add_handler(
@@ -299,6 +307,13 @@ class TelegramChannel(BaseChannel):
         await update.message.reply_text(
             "🐈 nanobot commands:\n"
             "/new — Start a new conversation\n"
+            "/model — Show current model\n"
+            "/status — Show session and system status\n"
+            "/compact — Force memory consolidation\n"
+            "/memory — Show long-term memory\n"
+            "/cron — List scheduled jobs\n"
+            "/skills — List available skills\n"
+            "/stop — Cancel the current request\n"
             "/help — Show available commands"
         )
 
