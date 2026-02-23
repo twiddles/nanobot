@@ -18,6 +18,57 @@
 
 📏 Real-time line count: **3,897 lines** (run `bash core_agent_lines.sh` to verify anytime)
 
+## 🔀 Fork Additions
+
+This fork ([twiddles/nanobot](https://github.com/twiddles/nanobot)) adds the following on top of upstream [HKUDS/nanobot](https://github.com/HKUDS/nanobot):
+
+### Claude Code OAuth Provider
+
+Use your **Claude Pro/Max subscription** directly — no separate API key needed. Reads OAuth tokens from `~/.claude/.credentials.json` (set via `claude setup-token`) and handles automatic token refresh.
+
+**Setup:**
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": "claude-code/claude-sonnet-4-5"
+    }
+  }
+}
+```
+
+That's it — no API key required. The provider reads your existing Claude Code credentials automatically.
+
+If you don't have the Claude CLI installed, you can pass a token directly:
+
+```json
+{
+  "providers": {
+    "claude_code": {
+      "apiKey": "sk-ant-oat01-your-token-here"
+    }
+  }
+}
+```
+
+Verify credentials with:
+```bash
+nanobot provider login claude-code
+```
+
+### `/stop` Command
+
+Cancel an in-flight request from Telegram (or any channel) by sending `/stop`. The agent loop uses task-based processing so `/stop` is handled immediately without waiting for the current request to finish.
+
+### Improved Tool Hints
+
+Richer progress messages when the agent uses tools — emoji indicators for web search, file operations, messages, and shell commands, with better truncation and formatting.
+
+### Upstream Sync
+
+Includes a `scripts/sync-upstream.sh` helper to pull and cherry-pick upstream community PRs.
+
 ## 📢 News
 
 - **2026-02-21** 🎉 Released **v0.1.4.post1** — new providers, media support across channels, and major stability improvements. See [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post1) for details.
@@ -603,6 +654,7 @@ Config file: `~/.nanobot/config.json`
 | `vllm` | LLM (local, any OpenAI-compatible server) | — |
 | `openai_codex` | LLM (Codex, OAuth) | `nanobot provider login openai-codex` |
 | `github_copilot` | LLM (GitHub Copilot, OAuth) | `nanobot provider login github-copilot` |
+| `claude_code` | LLM (Claude Pro/Max subscription, OAuth) | `claude setup-token` ([fork only](#claude-code-oauth-provider)) |
 
 <details>
 <summary><b>OpenAI Codex (OAuth)</b></summary>
@@ -631,6 +683,38 @@ nanobot agent -m "Hello!"
 ```
 
 > Docker users: use `docker run -it` for interactive OAuth login.
+
+</details>
+
+<details>
+<summary><b>Claude Code (OAuth, fork only)</b></summary>
+
+Uses your Claude Pro/Max subscription via OAuth tokens. Requires the [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) to obtain a token.
+
+**1. Get a token:**
+```bash
+claude setup-token
+```
+
+**2. Set model** (merge into `~/.nanobot/config.json`):
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": "claude-code/claude-opus-4-6"
+    }
+  }
+}
+```
+
+Available models: `claude-opus-4-6`, `claude-sonnet-4-5`, `claude-haiku-4-5-20251001` (use with `claude-code/` prefix).
+
+**3. Chat:**
+```bash
+nanobot agent -m "Hello!"
+```
+
+> Tokens are auto-refreshed from `~/.claude/.credentials.json`. If the CLI isn't available, pass a token directly via `providers.claude_code.apiKey` in config.
 
 </details>
 
