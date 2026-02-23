@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 from contextlib import AsyncExitStack
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
@@ -269,6 +270,7 @@ class AgentLoop:
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""
         self._running = True
+        self._started_at = datetime.now()
         await self._connect_mcp()
         logger.info("Agent loop started")
 
@@ -419,6 +421,19 @@ class AgentLoop:
             self.sessions.invalidate(session.key)
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
                                   content="New session started.")
+        if cmd == "/model":
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content=f"Current model: `{self.model}`")
+        if cmd == "/status":
+            return self._handle_status(msg, session)
+        if cmd == "/compact":
+            return await self._handle_compact(msg, session)
+        if cmd == "/memory":
+            return self._handle_memory(msg)
+        if cmd == "/cron":
+            return self._handle_cron(msg)
+        if cmd == "/skills":
+            return self._handle_skills(msg)
         if cmd == "/help":
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
                                   content=(
@@ -500,7 +515,6 @@ class AgentLoop:
 
     def _save_turn(self, session: Session, messages: list[dict], skip: int) -> None:
         """Save new-turn messages into session, truncating large tool results."""
-        from datetime import datetime
         for m in messages[skip:]:
             entry = {k: v for k, v in m.items() if k != "reasoning_content"}
             if entry.get("role") == "tool" and isinstance(entry.get("content"), str):
@@ -510,6 +524,115 @@ class AgentLoop:
             entry.setdefault("timestamp", datetime.now().isoformat())
             session.messages.append(entry)
         session.updated_at = datetime.now()
+
+    def _handle_status(self, msg: InboundMessage, session: Session) -> OutboundMessage:
+        """Handle /status command."""
+        uptime = ""
+        if hasattr(self, "_started_at"):
+            delta = datetime.now() - self._started_at
+            hours, remainder = divmod(int(delta.total_seconds()), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            if hours > 0:
+                uptime = f"{hours}h {minutes}m"
+            else:
+                uptime = f"{minutes}m {seconds}s"
+
+        lines = [
+            "📊 **Status**",
+            f"Model: `{self.model}`",
+            f"Session messages: {len(session.messages)}",
+            f"Memory window: {self.memory_window}",
+            f"Max tool iterations: {self.max_iterations}",
+            f"Tools loaded: {len(self.tools.get_definitions())}",
+        ]
+        if uptime:
+            lines.append(f"Uptime: {uptime}")
+        if self.cron_service:
+            jobs = self.cron_service.list_jobs(include_disabled=True)
+            lines.append(f"Cron jobs: {len(jobs)}")
+        return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                               content="\n".join(lines))
+
+    async def _handle_compact(self, msg: InboundMessage, session: Session) -> OutboundMessage:
+        """Handle /compact command."""
+        if not session.messages:
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content="Nothing to consolidate — session is empty.")
+        messages_to_archive = session.messages.copy()
+        session.clear()
+        self.sessions.save(session)
+        self.sessions.invalidate(session.key)
+
+        async def _consolidate():
+            temp = Session(key=session.key)
+            temp.messages = messages_to_archive
+            await self._consolidate_memory(temp, archive_all=True)
+
+        asyncio.create_task(_consolidate())
+        return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                               content=f"Compacting {len(messages_to_archive)} messages into memory. Session cleared.")
+
+    def _handle_memory(self, msg: InboundMessage) -> OutboundMessage:
+        """Handle /memory command."""
+        memory = MemoryStore(self.workspace)
+        content = memory.read_long_term()
+        if not content:
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content="Long-term memory is empty.")
+        if len(content) > 3800:
+            content = content[:3800] + "\n\n… (truncated)"
+        return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                               content=f"🧠 **Long-term Memory**\n\n{content}")
+
+    def _handle_cron(self, msg: InboundMessage) -> OutboundMessage:
+        """Handle /cron command."""
+        if not self.cron_service:
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content="Cron service is not enabled.")
+        jobs = self.cron_service.list_jobs(include_disabled=True)
+        if not jobs:
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content="No scheduled jobs.")
+        lines = ["⏰ **Scheduled Jobs**\n"]
+        for job in jobs:
+            status = "✅" if job.enabled else "⏸"
+            sched = job.schedule
+            if sched.kind == "every" and sched.every_ms:
+                interval = sched.every_ms / 1000
+                if interval >= 3600:
+                    sched_str = f"every {interval / 3600:.0f}h"
+                elif interval >= 60:
+                    sched_str = f"every {interval / 60:.0f}m"
+                else:
+                    sched_str = f"every {interval:.0f}s"
+            elif sched.kind == "cron" and sched.expr:
+                sched_str = f"`{sched.expr}`"
+                if sched.tz:
+                    sched_str += f" ({sched.tz})"
+            elif sched.kind == "at" and sched.at_ms:
+                sched_str = datetime.fromtimestamp(sched.at_ms / 1000).strftime("%Y-%m-%d %H:%M")
+            else:
+                sched_str = sched.kind
+            lines.append(f"{status} **{job.name}** (`{job.id}`)\n   {sched_str} — {job.payload.message[:60]}")
+        return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                               content="\n".join(lines))
+
+    def _handle_skills(self, msg: InboundMessage) -> OutboundMessage:
+        """Handle /skills command."""
+        skills = self.context.skills.list_skills(filter_unavailable=False)
+        if not skills:
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content="No skills found.")
+        lines = ["🛠 **Available Skills**\n"]
+        for s in sorted(skills, key=lambda x: x["name"]):
+            desc = self.context.skills._get_skill_description(s["name"])
+            meta = self.context.skills._get_skill_meta(s["name"])
+            available = self.context.skills._check_requirements(meta)
+            icon = "✅" if available else "❌"
+            source = f" _({s['source']})_" if s.get("source") == "workspace" else ""
+            lines.append(f"{icon} **{s['name']}**{source} — {desc}")
+        return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                               content="\n".join(lines))
 
     async def _consolidate_memory(self, session, archive_all: bool = False) -> bool:
         """Delegate to MemoryStore.consolidate(). Returns True on success."""
