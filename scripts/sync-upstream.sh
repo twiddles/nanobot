@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Sync local main with upstream HKUDS/nanobot, preserving local commits.
 #
-# Strategy: reset to upstream/main, then cherry-pick local-only commits.
-# This preserves upstream's exact SHAs (including merge commits) so GitHub
-# shows "N ahead, 0 behind" rather than duplicate diverged histories.
+# Strategy: merge upstream/main into local main.
+# This preserves all local SHAs so a normal `git push` always works.
 #
 # Usage:
-#   ./sync-upstream.sh          # fetch + sync only
-#   ./sync-upstream.sh --push   # fetch + sync + push to origin
+#   ./sync-upstream.sh          # fetch + merge only
+#   ./sync-upstream.sh --push   # fetch + merge + push to origin
 
 set -euo pipefail
 
@@ -62,30 +61,25 @@ elif [ "$REMOTE" = "$BASE" ]; then
     ok "Already ahead of upstream — nothing to sync."
     exit 0
 else
-    # Collect local-only commit SHAs (oldest first) for cherry-pick
-    LOCAL_COMMITS=$(git rev-list --reverse "$UPSTREAM_NAME/$BRANCH"..HEAD)
-    LOCAL_COUNT=$(echo "$LOCAL_COMMITS" | wc -l | tr -d ' ')
     UPSTREAM_NEW=$(git rev-list HEAD.."$UPSTREAM_NAME/$BRANCH" --count)
-    info "Replaying $LOCAL_COUNT local commit(s) on top of $UPSTREAM_NEW new upstream commit(s)"
+    info "Merging $UPSTREAM_NEW new upstream commit(s) into local $BRANCH"
 
-    # Reset to upstream, then cherry-pick local commits
-    git reset --hard "$UPSTREAM_NAME/$BRANCH"
-
-    if ! echo "$LOCAL_COMMITS" | xargs git cherry-pick; then
-        err "Cherry-pick conflict! Resolve manually, then:"
-        err "  git cherry-pick --continue"
-        err "  git push --force-with-lease origin $BRANCH"
+    if ! git merge "$UPSTREAM_NAME/$BRANCH" -m "Merge upstream/$BRANCH"; then
+        err "Merge conflict! Resolve manually, then:"
+        err "  git add <resolved-files>"
+        err "  git merge --continue"
+        err "  git push origin $BRANCH"
         err ""
-        err "Or abort with: git cherry-pick --abort"
+        err "Or abort with: git merge --abort"
         exit 1
     fi
-    ok "Sync successful — $LOCAL_COUNT local commit(s) replayed"
+    ok "Merge successful — $UPSTREAM_NEW upstream commit(s) integrated"
 fi
 
 # --- push ------------------------------------------------------------------
 if [[ "${1:-}" == "--push" ]]; then
-    info "Pushing to origin/$BRANCH (force-with-lease)"
-    git push --force-with-lease origin "$BRANCH"
+    info "Pushing to origin/$BRANCH"
+    git push origin "$BRANCH"
     ok "Pushed to origin/$BRANCH"
 else
     info "Run with --push to push to origin"
