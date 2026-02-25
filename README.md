@@ -16,7 +16,7 @@
 
 ⚡️ Delivers core agent functionality in just **~4,000** lines of code — **99% smaller** than Clawdbot's 430k+ lines.
 
-📏 Real-time line count: **3,897 lines** (run `bash core_agent_lines.sh` to verify anytime)
+📏 Real-time line count: **3,966 lines** (run `bash core_agent_lines.sh` to verify anytime)
 
 ## 🔀 Fork Additions
 
@@ -71,6 +71,9 @@ Includes a `scripts/sync-upstream.sh` helper to pull and cherry-pick upstream co
 
 ## 📢 News
 
+- **2026-02-24** 🚀 Released **v0.1.4.post2** — a reliability-focused release with a redesigned heartbeat, prompt cache optimization, and hardened provider & channel stability. See [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post2) for details.
+- **2026-02-23** 🔧 Virtual tool-call heartbeat, prompt cache optimization, Slack mrkdwn fixes.
+- **2026-02-22** 🛡️ Slack thread isolation, Discord typing fix, agent reliability improvements.
 - **2026-02-21** 🎉 Released **v0.1.4.post1** — new providers, media support across channels, and major stability improvements. See [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post1) for details.
 - **2026-02-20** 🐦 Feishu now receives multimodal files from users. More reliable memory under the hood.
 - **2026-02-19** ✨ Slack now sends files, Discord splits long messages, and subagents work in CLI mode.
