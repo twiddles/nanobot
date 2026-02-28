@@ -374,6 +374,28 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         model_overrides=(),
     ),
 
+    # Inception: Mercury diffusion LLM. OpenAI-compatible API.
+    # Routed as openai/ through LiteLLM with Inception's api_base.
+    ProviderSpec(
+        name="inception",
+        keywords=("inception", "mercury"),
+        env_key="INCEPTION_API_KEY",
+        display_name="Inception",
+        litellm_prefix="openai",             # mercury-coder → openai/mercury-coder
+        skip_prefixes=("openai/", "inception/"),
+        env_extras=(
+            ("OPENAI_API_KEY", "{api_key}"),  # LiteLLM needs this for openai/ prefix
+            ("OPENAI_API_BASE", "{api_base}"),
+        ),
+        is_gateway=False,
+        is_local=False,
+        detect_by_key_prefix="",
+        detect_by_base_keyword="inceptionlabs",
+        default_api_base="https://api.inceptionlabs.ai/v1",
+        strip_model_prefix=False,
+        model_overrides=(),
+    ),
+
     # === Local deployment (matched by config key, NOT by api_base) =========
 
     # vLLM / any OpenAI-compatible local server.
