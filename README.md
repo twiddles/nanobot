@@ -61,6 +61,30 @@ nanobot provider login claude-code
 
 Cancel an in-flight request from Telegram (or any channel) by sending `/stop`. The agent loop uses task-based processing so `/stop` is handled immediately without waiting for the current request to finish.
 
+### Inception Mercury Provider
+
+Native support for [Inception's Mercury](https://www.inceptionlabs.ai/) diffusion LLM — the first commercial-scale dLLM, with 5-10x faster inference than comparable models. Supports tool calling and 128K context.
+
+**Setup:**
+
+```json
+{
+  "providers": {
+    "inception": {
+      "apiKey": "sk_your-inception-key",
+      "apiBase": "https://api.inceptionlabs.ai/v1"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "mercury-coder"
+    }
+  }
+}
+```
+
+Available models: `mercury`, `mercury-coder`, `mercury-2`. Get an API key at [platform.inceptionlabs.ai](https://platform.inceptionlabs.ai).
+
 ### Improved Tool Hints
 
 Richer progress messages when the agent uses tools — emoji indicators for web search, file operations, messages, and shell commands, with better truncation and formatting.
@@ -715,6 +739,7 @@ Config file: `~/.nanobot/config.json`
 | `groq` | LLM + **Voice transcription** (Whisper) | [console.groq.com](https://console.groq.com) |
 | `gemini` | LLM (Gemini direct) | [aistudio.google.com](https://aistudio.google.com) |
 | `minimax` | LLM (MiniMax direct) | [platform.minimaxi.com](https://platform.minimaxi.com) |
+| `inception` | LLM (Mercury dLLM, ultra-fast inference) | [platform.inceptionlabs.ai](https://platform.inceptionlabs.ai) |
 | `aihubmix` | LLM (API gateway, access to all models) | [aihubmix.com](https://aihubmix.com) |
 | `siliconflow` | LLM (SiliconFlow/硅基流动) | [siliconflow.cn](https://siliconflow.cn) |
 | `volcengine` | LLM (VolcEngine/火山引擎) | [volcengine.com](https://www.volcengine.com) |
