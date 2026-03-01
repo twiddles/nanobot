@@ -8,6 +8,7 @@ from typing import Any
 
 from loguru import logger
 
+from nanobot.agent.retry import chat_with_retry
 from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.tools.shell import ExecTool
@@ -33,6 +34,8 @@ class SubagentManager:
         brave_api_key: str | None = None,
         exec_config: "ExecToolConfig | None" = None,
         restrict_to_workspace: bool = False,
+        max_retries: int = 3,
+        retry_backoff_seconds: float = 2.0,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.provider = provider
@@ -45,6 +48,8 @@ class SubagentManager:
         self.brave_api_key = brave_api_key
         self.exec_config = exec_config or ExecToolConfig()
         self.restrict_to_workspace = restrict_to_workspace
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
         self._running_tasks: dict[str, asyncio.Task[None]] = {}
         self._session_tasks: dict[str, set[str]] = {}  # session_key -> {task_id, ...}
 
@@ -121,7 +126,10 @@ class SubagentManager:
             while iteration < max_iterations:
                 iteration += 1
 
-                response = await self.provider.chat(
+                response = await chat_with_retry(
+                    self.provider,
+                    max_retries=self.max_retries,
+                    retry_backoff_seconds=self.retry_backoff_seconds,
                     messages=messages,
                     tools=tools.get_definitions(),
                     model=self.model,

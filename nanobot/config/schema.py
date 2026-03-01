@@ -227,6 +227,8 @@ class AgentDefaults(Base):
     max_tool_iterations: int = 40
     memory_window: int = 100
     reasoning_effort: str | None = None  # low / medium / high — enables LLM thinking mode
+    max_retries: int = 3                  # max retry attempts for transient LLM errors (0 = no retry)
+    retry_backoff_seconds: float = 2.0    # initial backoff delay; doubles each retry (exponential)
 
 
 class AgentsConfig(Base):

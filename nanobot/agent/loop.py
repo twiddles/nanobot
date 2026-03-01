@@ -15,6 +15,7 @@ from loguru import logger
 
 from nanobot.agent.context import ContextBuilder
 from nanobot.agent.memory import MemoryStore
+from nanobot.agent.retry import chat_with_retry
 from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
@@ -65,6 +66,8 @@ class AgentLoop:
         session_manager: SessionManager | None = None,
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
+        max_retries: int = 3,
+        retry_backoff_seconds: float = 2.0,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.bus = bus
@@ -81,6 +84,8 @@ class AgentLoop:
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
 
         self.context = ContextBuilder(workspace)
         self.sessions = session_manager or SessionManager(workspace)
@@ -96,6 +101,8 @@ class AgentLoop:
             brave_api_key=brave_api_key,
             exec_config=self.exec_config,
             restrict_to_workspace=restrict_to_workspace,
+            max_retries=max_retries,
+            retry_backoff_seconds=retry_backoff_seconds,
         )
 
         self._running = False
@@ -217,7 +224,10 @@ class AgentLoop:
         while iteration < self.max_iterations:
             iteration += 1
 
-            response = await self.provider.chat(
+            response = await chat_with_retry(
+                self.provider,
+                max_retries=self.max_retries,
+                retry_backoff_seconds=self.retry_backoff_seconds,
                 messages=messages,
                 tools=self.tools.get_definitions(),
                 model=self.model,
