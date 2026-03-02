@@ -274,6 +274,7 @@ class ClaudeCodeProvider(LLMProvider):
         model: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.7,
+        reasoning_effort: str | None = None,
     ) -> LLMResponse:
         model = model or self.default_model
         resolved = self._strip_model_prefix(model)
