@@ -1045,10 +1045,10 @@ def logs(
     follow: bool = typer.Option(True, "--follow/--no-follow", "-f/-F", help="Follow log output"),
     lines: int = typer.Option(50, "--lines", "-n", help="Number of lines to show"),
 ):
-    """Tail the nanobot systemd service logs."""
+    """Tail the nanobot-enterprise systemd service logs."""
     import subprocess
 
-    cmd = ["journalctl", "--user", "-u", "nanobot", f"-n{lines}"]
+    cmd = ["journalctl", "--user", "-u", "nanobot-enterprise", f"-n{lines}"]
     if follow:
         cmd.append("-f")
     try:

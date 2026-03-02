@@ -1,26 +1,21 @@
 <div align="center">
-  <img src="nanobot_logo.png" alt="nanobot" width="500">
-  <h1>nanobot: Ultra-Lightweight Personal AI Assistant</h1>
+  <img src="nanobot_logo.png" alt="nanobot-enterprise" width="500">
+  <h1>nanobot-enterprise</h1>
+  <p>A soft fork of <a href="https://github.com/HKUDS/nanobot">HKUDS/nanobot</a> — ultra-lightweight personal AI assistant</p>
   <p>
-    <a href="https://pypi.org/project/nanobot-ai/"><img src="https://img.shields.io/pypi/v/nanobot-ai" alt="PyPI"></a>
-    <a href="https://pepy.tech/project/nanobot-ai"><img src="https://static.pepy.tech/badge/nanobot-ai" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/python-≥3.11-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-    <a href="./COMMUNICATION.md"><img src="https://img.shields.io/badge/Feishu-Group-E9DBFC?style=flat&logo=feishu&logoColor=white" alt="Feishu"></a>
-    <a href="./COMMUNICATION.md"><img src="https://img.shields.io/badge/WeChat-Group-C5EAB4?style=flat&logo=wechat&logoColor=white" alt="WeChat"></a>
-    <a href="https://discord.gg/MnCvHqpUGB"><img src="https://img.shields.io/badge/Discord-Community-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"></a>
+    <img src="https://img.shields.io/badge/upstream-HKUDS%2Fnanobot-orange" alt="Upstream">
   </p>
 </div>
 
-🐈 **nanobot** is an **ultra-lightweight** personal AI assistant inspired by [OpenClaw](https://github.com/openclaw/openclaw) 
+**nanobot-enterprise** is a soft fork of [HKUDS/nanobot](https://github.com/HKUDS/nanobot) that tracks upstream and adds extra providers, quality-of-life improvements, and a systemd-first deployment story.
 
-⚡️ Delivers core agent functionality in just **~4,000** lines of code — **99% smaller** than Clawdbot's 430k+ lines.
-
-📏 Real-time line count: **3,935 lines** (run `bash core_agent_lines.sh` to verify anytime)
+See the upstream README for full documentation on nanobot's core features, architecture, and ~4,000-line agent.
 
 ## 🔀 Fork Additions
 
-This fork ([twiddles/nanobot](https://github.com/twiddles/nanobot)) adds the following on top of upstream [HKUDS/nanobot](https://github.com/HKUDS/nanobot):
+Changes on top of upstream [HKUDS/nanobot](https://github.com/HKUDS/nanobot):
 
 ### Claude Code OAuth Provider
 
@@ -1004,6 +999,7 @@ MCP tools are automatically discovered and registered on startup. The LLM can us
 | `nanobot agent --logs` | Show runtime logs during chat |
 | `nanobot gateway` | Start the gateway |
 | `nanobot status` | Show status |
+| `nanobot logs` | Tail the `nanobot-enterprise` systemd service logs |
 | `nanobot provider login openai-codex` | OAuth login for providers |
 | `nanobot channels login` | Link WhatsApp (scan QR) |
 | `nanobot channels status` | Show channel status |
@@ -1096,7 +1092,7 @@ Run the gateway as a systemd user service so it starts automatically and restart
 which nanobot   # e.g. /home/user/.local/bin/nanobot
 ```
 
-**2. Create the service file** at `~/.config/systemd/user/nanobot-gateway.service` (replace `ExecStart` path if needed):
+**2. Create the service file** at `~/.config/systemd/user/nanobot-enterprise.service` (replace `ExecStart` path if needed):
 
 ```ini
 [Unit]
@@ -1120,15 +1116,22 @@ WantedBy=default.target
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now nanobot-gateway
+systemctl --user enable --now nanobot-enterprise
+```
+
+**4. View logs:**
+
+```bash
+nanobot logs          # follow logs (same as journalctl)
+nanobot logs -F       # print last 50 lines without following
+nanobot logs -n 100   # show last 100 lines
 ```
 
 **Common operations:**
 
 ```bash
-systemctl --user status nanobot-gateway        # check status
-systemctl --user restart nanobot-gateway       # restart after config changes
-journalctl --user -u nanobot-gateway -f        # follow logs
+systemctl --user status nanobot-enterprise        # check status
+systemctl --user restart nanobot-enterprise       # restart after config changes
 ```
 
 If you edit the `.service` file itself, run `systemctl --user daemon-reload` before restarting.
