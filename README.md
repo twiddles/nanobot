@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="nanobot_logo.png" alt="nanobot-enterprise" width="500">
-  <h1>nanobot-enterprise</h1>
+  <img src="nanobot_logo.png" alt="nanobot" width="500">
+  <h1>nanobot</h1>
   <p>A soft fork of <a href="https://github.com/HKUDS/nanobot">HKUDS/nanobot</a> — ultra-lightweight personal AI assistant</p>
   <p>
     <img src="https://img.shields.io/badge/python-≥3.11-blue" alt="Python">
@@ -9,7 +9,7 @@
   </p>
 </div>
 
-**nanobot-enterprise** is a soft fork of [HKUDS/nanobot](https://github.com/HKUDS/nanobot) that tracks upstream and adds extra providers, quality-of-life improvements, and a systemd-first deployment story.
+**nanobot** is a soft fork of [HKUDS/nanobot](https://github.com/HKUDS/nanobot) that tracks upstream and adds extra providers, quality-of-life improvements, and a systemd-first deployment story.
 
 See the upstream README for full documentation on nanobot's core features, architecture, and ~4,000-line agent.
 
@@ -999,7 +999,7 @@ MCP tools are automatically discovered and registered on startup. The LLM can us
 | `nanobot agent --logs` | Show runtime logs during chat |
 | `nanobot gateway` | Start the gateway |
 | `nanobot status` | Show status |
-| `nanobot logs` | Tail the `nanobot-enterprise` systemd service logs |
+| `nanobot logs` | Tail the `nanobot-gateway` systemd service logs |
 | `nanobot provider login openai-codex` | OAuth login for providers |
 | `nanobot channels login` | Link WhatsApp (scan QR) |
 | `nanobot channels status` | Show channel status |
@@ -1092,7 +1092,7 @@ Run the gateway as a systemd user service so it starts automatically and restart
 which nanobot   # e.g. /home/user/.local/bin/nanobot
 ```
 
-**2. Create the service file** at `~/.config/systemd/user/nanobot-enterprise.service` (replace `ExecStart` path if needed):
+**2. Create the service file** at `~/.config/systemd/user/nanobot-gateway.service` (replace `ExecStart` path if needed):
 
 ```ini
 [Unit]
@@ -1116,7 +1116,7 @@ WantedBy=default.target
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now nanobot-enterprise
+systemctl --user enable --now nanobot-gateway
 ```
 
 **4. View logs:**
@@ -1130,8 +1130,8 @@ nanobot logs -n 100   # show last 100 lines
 **Common operations:**
 
 ```bash
-systemctl --user status nanobot-enterprise        # check status
-systemctl --user restart nanobot-enterprise       # restart after config changes
+systemctl --user status nanobot-gateway        # check status
+systemctl --user restart nanobot-gateway       # restart after config changes
 ```
 
 If you edit the `.service` file itself, run `systemctl --user daemon-reload` before restarting.
