@@ -169,10 +169,24 @@ class AgentLoop:
 
     @staticmethod
     def _strip_think(text: str | None) -> str | None:
-        """Remove <think>…</think> blocks that some models embed in content."""
+        """Remove <think>…</think> blocks that some models embed in content.
+
+        Handles variants:
+        - Standard: <think>...</think>
+        - Missing opening tag: reasoning text...</think>  (Qwen, GLM)
+        - Nested or repeated blocks
+        """
         if not text:
             return None
-        return re.sub(r"<think>[\s\S]*?</think>", "", text).strip() or None
+        # First, strip standard <think>…</think> blocks (greedy to catch nested)
+        result = re.sub(r"<think>[\s\S]*?</think>", "", text)
+        # If there's still a </think> tag, the model omitted the opening <think>.
+        # Strip everything up to and including the last </think>.
+        if "</think>" in result:
+            result = result[result.rfind("</think>") + len("</think>"):]
+        # Also strip orphaned opening <think> tags (model cut off mid-thought)
+        result = re.sub(r"<think>[\s\S]*$", "", result)
+        return result.strip() or None
 
     @staticmethod
     def _tool_hint(tool_calls: list) -> str:
