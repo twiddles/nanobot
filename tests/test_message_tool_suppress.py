@@ -112,7 +112,7 @@ class TestMessageToolSuppressLogic:
         assert final_content == "Done"
         assert progress == [
             ("Visible", False),
-            ('read_file("foo.txt")', True),
+            ('📄 read file `foo.txt`', True),
         ]
 
 
