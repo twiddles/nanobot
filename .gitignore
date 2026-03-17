@@ -22,3 +22,5 @@ poetry.lock
 botpy.log
 nano.*.save
 node_modules/
+.DS_Store
+uv.lock
