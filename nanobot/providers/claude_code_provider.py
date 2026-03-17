@@ -17,7 +17,7 @@ from loguru import logger
 from nanobot.providers.base import LLMProvider, LLMResponse, ToolCallRequest
 
 _CREDENTIALS_PATH = Path.home() / ".claude" / ".credentials.json"
-_TOKEN_ENDPOINT = "https://console.anthropic.com/v1/oauth/token"
+_TOKEN_ENDPOINT = "https://platform.claude.com/v1/oauth/token"
 _MESSAGES_URL = "https://api.anthropic.com/v1/messages?beta=true"
 _CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 
@@ -25,6 +25,8 @@ _SYSTEM_PREFIX = (
     "You are Claude Code, Anthropic's official CLI for Claude, "
     "running as a backend agent.\n\n"
 )
+
+_BILLING_HEADER = "x-anthropic-billing-header: cc_version=2.1.77; cc_entrypoint=cli; cch=00000;"
 
 _BETA_FLAGS = ",".join([
     "oauth-2025-04-20",
@@ -275,6 +277,7 @@ class ClaudeCodeProvider(LLMProvider):
         max_tokens: int = 4096,
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> LLMResponse:
         model = model or self.default_model
         resolved = self._strip_model_prefix(model)
@@ -284,14 +287,37 @@ class ClaudeCodeProvider(LLMProvider):
         system, anthropic_msgs = self._convert_messages(messages)
         anthropic_tools = self._convert_tools(tools or [])
 
+        system_blocks = [
+            {"type": "text", "text": _BILLING_HEADER},
+            {"type": "text", "text": system},
+        ]
+
         body: dict[str, Any] = {
             "model": resolved,
             "max_tokens": max(1, max_tokens),
-            "system": system,
+            "system": system_blocks,
             "messages": anthropic_msgs,
             "tools": anthropic_tools,
             "stream": False,
         }
+
+        if tool_choice is not None:
+            if isinstance(tool_choice, str):
+                # "auto" / "any" / "required" → {"type": ...}
+                tc_type = "any" if tool_choice == "required" else tool_choice
+                body["tool_choice"] = {"type": tc_type}
+            elif isinstance(tool_choice, dict):
+                # Convert OpenAI format to Anthropic format
+                # OpenAI: {"type": "function", "function": {"name": "X"}}
+                # Anthropic: {"type": "tool", "name": "mcp_X"}
+                fn = tool_choice.get("function")
+                if fn and isinstance(fn, dict) and fn.get("name"):
+                    body["tool_choice"] = {
+                        "type": "tool",
+                        "name": f"mcp_{fn['name']}",
+                    }
+                else:
+                    body["tool_choice"] = tool_choice
 
         try:
             async with httpx.AsyncClient(timeout=600.0) as client:
