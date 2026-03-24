@@ -18,6 +18,7 @@ class ChannelsConfig(Base):
 
     Built-in and plugin channel configs are stored as extra fields (dicts).
     Each channel parses its own config in __init__.
+    Per-channel "streaming": true enables streaming output (requires send_delta impl).
     """
 
     model_config = ConfigDict(extra="allow")
@@ -78,10 +79,12 @@ class ProvidersConfig(Base):
     dashscope: ProviderConfig = Field(default_factory=ProviderConfig)
     vllm: ProviderConfig = Field(default_factory=ProviderConfig)
     ollama: ProviderConfig = Field(default_factory=ProviderConfig)  # Ollama local models
+    ovms: ProviderConfig = Field(default_factory=ProviderConfig)  # OpenVINO Model Server (OVMS)
     gemini: ProviderConfig = Field(default_factory=ProviderConfig)
     moonshot: ProviderConfig = Field(default_factory=ProviderConfig)
     minimax: ProviderConfig = Field(default_factory=ProviderConfig)
     inception: ProviderConfig = Field(default_factory=ProviderConfig)  # Inception Mercury (dLLM)
+    mistral: ProviderConfig = Field(default_factory=ProviderConfig)
     aihubmix: ProviderConfig = Field(default_factory=ProviderConfig)  # AiHubMix API gateway
     siliconflow: ProviderConfig = Field(default_factory=ProviderConfig)  # SiliconFlow (硅基流动)
     volcengine: ProviderConfig = Field(default_factory=ProviderConfig)  # VolcEngine (火山引擎)
@@ -98,6 +101,7 @@ class HeartbeatConfig(Base):
 
     enabled: bool = True
     interval_s: int = 30 * 60  # 30 minutes
+    keep_recent_messages: int = 8
 
 
 class GatewayConfig(Base):
@@ -129,9 +133,9 @@ class WebToolsConfig(Base):
 class ExecToolConfig(Base):
     """Shell exec tool configuration."""
 
+    enable: bool = True
     timeout: int = 60
     path_append: str = ""
-
 
 class MCPServerConfig(Base):
     """MCP server connection configuration (stdio or HTTP)."""
@@ -172,12 +176,15 @@ class Config(BaseSettings):
         self, model: str | None = None
     ) -> tuple["ProviderConfig | None", str | None]:
         """Match provider config and its registry name. Returns (config, spec_name)."""
-        from nanobot.providers.registry import PROVIDERS
+        from nanobot.providers.registry import PROVIDERS, find_by_name
 
         forced = self.agents.defaults.provider
         if forced != "auto":
-            p = getattr(self.providers, forced, None)
-            return (p, forced) if p else (None, None)
+            spec = find_by_name(forced)
+            if spec:
+                p = getattr(self.providers, spec.name, None)
+                return (p, spec.name) if p else (None, None)
+            return None, None
 
         model_lower = (model or self.agents.defaults.model).lower()
         model_normalized = model_lower.replace("-", "_")
